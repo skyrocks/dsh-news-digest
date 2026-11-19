@@ -1,0 +1,7 @@
+{
+  "meta": {
+    "title": "News digest",
+    "description": "Searches the live news once a day for the categories you pick (fixed categories can be toggled, plus your own custom ones) and saves a daily digest you can reopen. It runs on a daily schedule and also once on your first DSH use each morning (whichever comes first: DSH start, or the first human message that day; one run per day). Searching happens in one model turn with web_search, so it spends tokens; digests live in $DSH_HOME/news-digest/ and are readable and deletable under Settings → News digest. Nothing triggers while the plugin is off.",
+    "detail": "docs/DETAIL.md"
+  }
+}

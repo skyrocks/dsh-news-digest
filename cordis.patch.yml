@@ -1,0 +1,6 @@
+# dsh-news-digest 插件行：作为 bundle patch 自动注入 profile 组合。
+# 类别、每天几点、首次使用开关都不在这里配：装好后到「设置 → 新闻日报」里改，
+# 存在 $DSH_HOME/news-digest/settings.json；日报也在同一个目录下。
+- insert:
+    - id: news-digest
+      name: "@skyrocks/dsh-news-digest"

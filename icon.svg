@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 48 48" role="img" aria-label="News digest">
+  <defs>
+    <linearGradient id="nd-bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#5b78ff"/>
+      <stop offset="1" stop-color="#3b55d8"/>
+    </linearGradient>
+  </defs>
+  <rect width="48" height="48" rx="11" fill="url(#nd-bg)"/>
+  <path d="M13 11h19.5a2.5 2.5 0 0 1 2.5 2.5V35a2 2 0 0 1-2 2H13a2 2 0 0 1-2-2V13a2 2 0 0 1 2-2Z" fill="#ffffff" opacity=".96"/>
+  <rect x="14.5" y="14.5" width="10.5" height="8.5" rx="1.6" fill="#3b55d8" opacity=".9"/>
+  <rect x="27.5" y="15" width="7.5" height="2.4" rx="1.2" fill="#8f9ddc"/>
+  <rect x="27.5" y="19.2" width="7.5" height="2.4" rx="1.2" fill="#8f9ddc"/>
+  <rect x="14.5" y="26" width="20.5" height="2.4" rx="1.2" fill="#b7c0e6"/>
+  <rect x="14.5" y="30.2" width="16" height="2.4" rx="1.2" fill="#b7c0e6"/>
+</svg>

@@ -1,0 +1,87 @@
+{
+  "name": "@skyrocks/dsh-news-digest",
+  "version": "0.1.1",
+  "description": "DeepSeek Harness 插件：每天按你选的类别搜一次实时新闻，出一份可回看的日报；定时之外，每天上午第一次用 DSH 时也会补一次",
+  "license": "MIT",
+  "type": "module",
+  "main": "./index.js",
+  "exports": {
+    ".": "./index.js",
+    "./client": "./client.js",
+    "./typert": "./typert.host.js",
+    "./locale/*.json": "./locale/*.json",
+    "./icon": "./icon.svg",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "index.js",
+    "service.js",
+    "store.js",
+    "report.js",
+    "schedule.js",
+    "trigger.js",
+    "tools.js",
+    "client.js",
+    "typert.host.js",
+    "cordis.patch.yml",
+    "README.md",
+    "README.en.md",
+    "CHANGELOG.md",
+    "LICENSE",
+    "docs",
+    "icon.svg",
+    "locale/*.json"
+  ],
+  "engines": {
+    "node": ">=18",
+    "dsh": ">=0.2.2-rc.2 <0.3.0"
+  },
+  "dsh": {
+    "manifestVersion": 1,
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web",
+      "inject": [
+        "@deepseek-ai/dsh-api-gateway",
+        "@deepseek-ai/dsh-api-remotes"
+      ],
+      "immediately": true
+    }
+  },
+  "devDependencies": {
+    "@deepseek-ai/cordis": "~4.1.0",
+    "@deepseek-ai/dsh-typert-protocol": "0.2.2-rc.2"
+  },
+  "keywords": [
+    "deepseek-harness",
+    "dsh",
+    "dsh-plugin",
+    "news",
+    "digest",
+    "daily",
+    "web-search"
+  ],
+  "peerDependencies": {
+    "react": "^18.2.0",
+    "@deepseek-ai/cordis": "~4.1.0",
+    "@deepseek-ai/dsh-typert-protocol": "0.2.2-rc.2"
+  },
+  "author": "skyrocks (https://github.com/skyrocks)",
+  "scripts": {
+    "test": "node test/store.mjs && node test/report.mjs && node test/trigger.mjs && node test/tools.mjs && node test/service.mjs && node test/client.mjs && node test/manifest.mjs",
+    "check": "node test/manifest.mjs"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/skyrocks/dsh-news-digest.git"
+  },
+  "homepage": "https://github.com/skyrocks/dsh-news-digest#readme",
+  "bugs": {
+    "url": "https://github.com/skyrocks/dsh-news-digest/issues"
+  }
+}

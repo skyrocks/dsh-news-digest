@@ -1,0 +1,50 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="640" height="300" viewBox="0 0 640 300" role="img" aria-label="Morning news digest illustration: a rising sun next to a daily digest card with category rows">
+  <defs>
+    <linearGradient id="nd-card" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffffff" stop-opacity=".98"/>
+      <stop offset="1" stop-color="#eef1fb" stop-opacity=".98"/>
+    </linearGradient>
+    <linearGradient id="nd-sun" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffc46b"/>
+      <stop offset="1" stop-color="#f09045"/>
+    </linearGradient>
+    <linearGradient id="nd-sky" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#dbe3ff" stop-opacity=".9"/>
+      <stop offset="1" stop-color="#eef2ff" stop-opacity=".55"/>
+    </linearGradient>
+  </defs>
+
+  <rect x="32" y="32" width="576" height="236" rx="20" fill="url(#nd-sky)"/>
+
+  <!-- 早晨：地平线上的太阳 -->
+  <circle cx="132" cy="150" r="42" fill="url(#nd-sun)"/>
+  <path d="M66 176h132" stroke="#f0a24a" stroke-opacity=".55" stroke-width="4" stroke-linecap="round"/>
+  <path d="M96 120l-10-14M132 106v-18M168 120l10-14" stroke="#f0a24a" stroke-opacity=".6" stroke-width="5" stroke-linecap="round"/>
+
+  <!-- 日报卡片 -->
+  <rect x="222" y="60" width="350" height="180" rx="16" fill="url(#nd-card)" stroke="#4d6bfe" stroke-opacity=".18" stroke-width="2"/>
+
+  <!-- 卡头：日期条 + 音量/时钟 -->
+  <rect x="246" y="82" width="96" height="12" rx="6" fill="#4d6bfe" fill-opacity=".85"/>
+  <rect x="246" y="102" width="180" height="8" rx="4" fill="#9aa3b8" fill-opacity=".55"/>
+  <circle cx="546" cy="90" r="12" fill="none" stroke="#4d6bfe" stroke-opacity=".45" stroke-width="2.5"/>
+  <path d="M546 84v7l5 3" stroke="#4d6bfe" stroke-opacity=".7" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+
+  <!-- 一组新闻：类别标签 + 标题条 + 概览条 -->
+  <rect x="246" y="126" width="42" height="12" rx="6" fill="#f0a24a" fill-opacity=".9"/>
+  <rect x="296" y="126" width="180" height="12" rx="6" fill="#3d465f" fill-opacity=".72"/>
+  <rect x="246" y="146" width="250" height="7" rx="3.5" fill="#9aa3b8" fill-opacity=".45"/>
+
+  <rect x="246" y="166" width="42" height="12" rx="6" fill="#4d6bfe" fill-opacity=".75"/>
+  <rect x="296" y="166" width="150" height="12" rx="6" fill="#3d465f" fill-opacity=".72"/>
+  <rect x="246" y="186" width="228" height="7" rx="3.5" fill="#9aa3b8" fill-opacity=".45"/>
+
+  <rect x="246" y="206" width="42" height="12" rx="6" fill="#2f9e44" fill-opacity=".7"/>
+  <rect x="296" y="206" width="196" height="12" rx="6" fill="#3d465f" fill-opacity=".72"/>
+  <rect x="246" y="226" width="164" height="7" rx="3.5" fill="#9aa3b8" fill-opacity=".45"/>
+
+  <!-- 左侧的小卡片：说明这是「第一次使用时补的一页」 -->
+  <rect x="72" y="206" width="120" height="52" rx="12" fill="#4d6bfe" fill-opacity=".12" stroke="#4d6bfe" stroke-opacity=".28" stroke-width="2"/>
+  <rect x="88" y="222" width="56" height="8" rx="4" fill="#4d6bfe" fill-opacity=".65"/>
+  <rect x="88" y="238" width="82" height="6" rx="3" fill="#4d6bfe" fill-opacity=".35"/>
+</svg>
