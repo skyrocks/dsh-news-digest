@@ -84,7 +84,7 @@ test('TYPERT：包名、命名空间与 invocation id 一致', () => {
     assert.equal(item.result.mode, 'strict')
     assert.equal(typeof item.result.create, 'function')
   }
-  assert.deepEqual([...ids].map((id) => id.split('/').pop()), ['status', 'saveSettings', 'report', 'reports', 'runNow'])
+  assert.deepEqual([...ids].map((id) => id.split('/').pop()), ['status', 'saveSettings', 'report', 'reports', 'runNow', 'openInBrowser'])
 })
 
 test('client：注册 id、远端声明与设置页入口一致', async () => {

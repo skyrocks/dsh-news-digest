@@ -43,6 +43,8 @@ test('report：保存 → 索引 → 读 → 删', async () => {
   assert.equal(saved.items, 1)
   assert.equal(existsSync(join(dir, 'reports', `${saved.id}.json`)), true)
   assert.equal(existsSync(join(dir, 'reports', `${saved.id}.md`)), true)
+  assert.equal(existsSync(join(dir, 'reports', `${saved.id}.html`)), true)
+  assert.match(saved.htmlPath, /\.html$/)
 
   const status = await service.status()
   assert.equal(status.hasToday, true)
@@ -60,7 +62,14 @@ test('report：保存 → 索引 → 读 → 删', async () => {
   const removed = await service.reports({ action: 'delete', id: saved.id })
   assert.equal(removed.removed, true)
   assert.equal(existsSync(join(dir, 'reports', `${saved.id}.md`)), false)
+  assert.equal(existsSync(join(dir, 'reports', `${saved.id}.html`)), false)
   assert.equal((await service.reports({ action: 'list' })).total, 0)
+})
+
+test('openInBrowser：参数不合法时明确拒绝（不真的开浏览器）', async () => {
+  await assert.rejects(() => service.openInBrowser({}), /缺少日报日期/)
+  await assert.rejects(() => service.openInBrowser({ id: 'x' }), /缺少日报日期/)
+  await assert.rejects(() => service.openInBrowser({ id: '2026-01-01' }), /没有 2026-01-01 这份日报/)
 })
 
 test('report：没有内容不保存；同一天再存会覆盖', async () => {
@@ -172,6 +181,29 @@ test('syncSchedule：没有任务 / 没有定时服务时安静跳过', async ()
   assert.equal((await service.syncSchedule()).reason, 'no-task')
   await service.saveSettings({ schedule: { scheduleId: 'schedule-x' } })
   assert.equal((await service.syncSchedule()).reason, 'no-schedule-service')
+})
+
+test('firstUseCheck：今天已有日报时把补跑计数收干净', async () => {
+  const today = dayKey()
+  const { readFile, writeFile } = await import('node:fs/promises')
+  const dirState = join(dir, 'state.json')
+  await service.report({ groups: [{ category: '国内', items: [{ title: '今天的' }] }] })
+  await writeFile(dirState, JSON.stringify({
+    version: 1,
+    lastTriggerDay: today,
+    lastTriggerKind: 'retry',
+    lastTriggerError: '上次投递后没有出报',
+    retryDay: today,
+    retryCount: 2,
+  }))
+  const result = await service.firstUseCheck('prompt')
+  assert.equal(result.fired, false)
+  assert.equal(result.reason, 'already-triggered')
+  const state = JSON.parse(await readFile(dirState, 'utf8'))
+  assert.equal(state.retryCount, 0)
+  assert.equal(state.retryDay, '')
+  assert.equal(state.lastTriggerError, '')
+  await service.reports({ action: 'delete', id: today })
 })
 
 test('dispose 可重复调用', () => {

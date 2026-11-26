@@ -21,7 +21,7 @@ window.__ModuleLoader__.load({
     const codec = (typeSymbol) => ({ mode: "strict", typeSymbol, create: passThrough });
     const parameter = (name) => ({ name, wire: name, source: "json", codec: codec(`@skyrocks/dsh-news-digest#${name}`) });
 
-    const METHODS = ["status", "saveSettings", "report", "reports", "runNow"];
+    const METHODS = ["status", "saveSettings", "report", "reports", "runNow", "openInBrowser"];
     const REMOTE = {
       package: "@skyrocks/dsh-news-digest",
       descriptors: METHODS.map((method) => ({
@@ -112,22 +112,12 @@ window.__ModuleLoader__.load({
       ".dsh-nd-ok{padding:8px 10px;border-radius:8px;font-size:11.5px;line-height:1.5;color:var(--dsw-alias-state-success-primary,#2f9e44);background:color-mix(in srgb,var(--dsw-alias-state-success-primary,#2f9e44) 10%,transparent);}",
       ".dsh-nd-foot{display:flex;align-items:center;gap:8px;justify-content:flex-end;flex-wrap:wrap;}",
       ".dsh-nd-foot .dsh-nd-spacer{flex:1;}",
-      ".dsh-nd-overlay{position:fixed;inset:0;z-index:2200;pointer-events:auto;display:flex;align-items:center;justify-content:center;padding:24px;background:rgba(0,0,0,.38);}",
-      ".dsh-nd-dialog{width:min(680px,100%);max-height:calc(100vh - 64px);overflow:auto;border-radius:12px;background:var(--dsw-alias-bg-module-platform,#fff);border:1px solid var(--dsw-alias-border-l1,rgba(127,127,127,.22));box-shadow:0 18px 48px rgba(0,0,0,.26);color:var(--dsw-alias-label-primary,#1f2329);padding:18px;display:flex;flex-direction:column;gap:12px;}",
-      ".dsh-nd-dialog h2{margin:0;font-size:14px;font-weight:600;}",
-      ".dsh-nd-dialog h2:focus-visible{outline:2px solid var(--dsw-alias-state-business-primary,#4d6bfe);outline-offset:2px;}",
-      ".dsh-nd-dialog-foot{display:flex;justify-content:flex-end;gap:8px;}",
-      ".dsh-nd-report{display:flex;flex-direction:column;gap:12px;font-size:12.5px;line-height:1.7;}",
-      ".dsh-nd-report h4{margin:0 0 6px;font-size:11px;letter-spacing:.04em;color:var(--dsw-alias-label-tertiary,#8a8f98);}",
-      ".dsh-nd-report p{margin:0;white-space:pre-wrap;overflow-wrap:anywhere;}",
-      ".dsh-nd-report ol,.dsh-nd-report ul{margin:0;padding-left:18px;display:flex;flex-direction:column;gap:7px;}",
-      ".dsh-nd-report li b{font-weight:600;}",
-      ".dsh-nd-report a{color:var(--dsw-alias-state-business-primary,#4d6bfe);text-decoration:none;}",
-      ".dsh-nd-report a:hover{text-decoration:underline;}",
-      ".dsh-nd-report-sum{color:var(--dsw-alias-label-secondary,#6b7280);}",
-      ".dsh-nd-report-meta{margin-top:2px;font-size:11px;color:var(--dsw-alias-label-tertiary,#8a8f98);}",
-      ".dsh-nd-overview{padding:10px;border-radius:8px;background:color-mix(in srgb,currentColor 4%,transparent);}",
-      ".dsh-nd-text{margin:0;padding:12px;border-radius:8px;background:color-mix(in srgb,currentColor 4%,transparent);font-size:12px;line-height:1.7;white-space:pre-wrap;overflow-wrap:anywhere;max-height:52vh;overflow:auto;}"
+      ".dsh-nd-notice{position:fixed;right:20px;bottom:20px;z-index:2100;pointer-events:auto;width:min(360px,calc(100vw - 40px));border-radius:12px;padding:14px;background:var(--dsw-alias-bg-module-platform,#fff);border:1px solid var(--dsw-alias-border-l1,rgba(127,127,127,.22));box-shadow:0 14px 36px rgba(0,0,0,.24);color:var(--dsw-alias-label-primary,#1f2329);display:flex;flex-direction:column;gap:8px;}",
+      ".dsh-nd-notice-head{display:flex;align-items:flex-start;gap:8px;}",
+      ".dsh-nd-notice-title{flex:1;min-width:0;font-size:12.5px;font-weight:600;}",
+      ".dsh-nd-notice-x{flex:none;border:0;background:transparent;color:var(--dsw-alias-label-tertiary,#8a8f98);font-size:14px;line-height:1;cursor:pointer;padding:2px 4px;}",
+      ".dsh-nd-notice-text{font-size:11.5px;line-height:1.6;color:var(--dsw-alias-label-secondary,#6b7280);max-height:66px;overflow:hidden;}",
+      ".dsh-nd-notice-actions{display:flex;justify-content:flex-end;gap:8px;}",
     ].join("");
 
     function ensureStyle() {
@@ -180,6 +170,13 @@ window.__ModuleLoader__.load({
       return `${sameYear ? day : `${date.getFullYear()}-${day}`} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
     }
 
+    function dayStamp(value) {
+      const date = new Date(value);
+      if (Number.isNaN(date.getTime())) return "";
+      const pad = (number) => String(number).padStart(2, "0");
+      return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+    }
+
     function sourceLabel(source) {
       return SOURCE_LABEL[source] ?? "其他来源";
     }
@@ -219,109 +216,140 @@ window.__ModuleLoader__.load({
       return "定时和第一次使用都关着，不会自动出报";
     }
 
-    // ── 日报正文（结构化渲染，不直接吐 markdown） ──────────────────────────
+    // ── 出报通知 ────────────────────────────────────────────────────────────
+    //
+    // 日报正文不再用弹框：新报告出现时在右下角推一张卡（有系统通知就一起弹），
+    // 点「打开」用系统默认浏览器打开本地 HTML 页面（dsh-news-digest/reports/<日期>.html）。
 
-    function ReportBodyView(props) {
-      const body = props.body;
-      const fallback = props.markdown;
-      if (body === null || body === undefined || !Array.isArray(body.groups)) {
-        return React.createElement("pre", { className: "dsh-nd-text" }, fallback ?? "");
+    // 已经提示过的日报：关掉过的不再弹。
+    const seenReports = new Set();
+    let lastNewestId = null;
+
+    function systemNotify(report) {
+      try {
+        if (typeof Notification === "undefined") return;
+        if (Notification.permission !== "granted") {
+          Notification.requestPermission?.();
+          return;
+        }
+        const toast = new Notification("新闻日报", {
+          body: report.overview === "" ? report.title : report.overview,
+          tag: report.id
+        });
+        toast.onclick = () => {
+          openReportInBrowser(report.id);
+          toast.close();
+        };
+      } catch {
+        // 系统通知不可用不影响页内卡片
       }
-      const children = [];
-      if (typeof body.overview === "string" && body.overview !== "") {
-        children.push(React.createElement("p", { className: "dsh-nd-overview", key: "overview" }, body.overview));
-      }
-      if (Array.isArray(body.focus) && body.focus.length > 0) {
-        children.push(React.createElement(
-          "section",
-          { key: "focus" },
-          React.createElement("h4", null, "值得先看"),
-          React.createElement("ol", null, body.focus.map((entry, index) => React.createElement(
-            "li",
-            { key: index },
-            React.createElement("b", null, entry.title ?? ""),
-            entry.detail === undefined || entry.detail === "" ? null : ` — ${entry.detail}`
-          )))
-        ));
-      }
-      for (const group of body.groups) {
-        children.push(React.createElement(
-          "section",
-          { key: `g-${group.category}` },
-          React.createElement("h4", null, group.category),
-          React.createElement("ul", null, (group.items ?? []).map((item, index) => React.createElement(
-            "li",
-            { key: index },
-            item.url === ""
-              ? React.createElement("b", null, item.title)
-              : React.createElement("a", { href: item.url, target: "_blank", rel: "noreferrer noopener" }, item.title),
-            item.summary === "" ? null : React.createElement("div", { className: "dsh-nd-report-sum" }, item.summary),
-            (() => {
-              const meta = [item.source, item.publishedAt].filter((value) => typeof value === "string" && value !== "").join(" · ");
-              return meta === "" ? null : React.createElement("div", { className: "dsh-nd-report-meta" }, meta);
-            })()
-          )))
-        ));
-      }
-      return React.createElement("div", { className: "dsh-nd-report" }, ...children);
     }
 
-    function ReportDialog(props) {
-      const { report, onClose } = props;
-      const titleRef = React.useRef(null);
-      const dialogRef = React.useRef(null);
+    /** 打开失败的文案：旧进程没有这个接口时，说清楚要重启，而不是甩一串英文。 */
+    function openFailureText(failure) {
+      const raw = failure instanceof Error ? failure.message : String(failure ?? "");
+      if (/is not a function|not found|unknown|no such|未注册|不存在|missing|undefined/i.test(raw)) {
+        return "打开失败：当前 DSH 进程还是旧版本，没有「打开日报」接口。完全退出 DSH（⌘Q）后重新打开再试。";
+      }
+      return `打开失败：${raw}`;
+    }
+
+    /** 打开成功后让设置页立刻把红点刷掉，不用等 30 秒轮询。 */
+    function announceOpened(id) {
+      try {
+        if (typeof window !== "undefined" && typeof window.dispatchEvent === "function") {
+          window.dispatchEvent(new CustomEvent("dsh-news-digest:opened", { detail: { id } }));
+        }
+      } catch {
+        // 事件不可用不影响打开本身
+      }
+    }
+
+    async function openReportInBrowser(id) {
+      try {
+        await call("openInBrowser", { id });
+        announceOpened(id);
+        notify("已在浏览器里打开", true);
+      } catch (failure) {
+        notify(openFailureText(failure), false);
+      }
+    }
+
+    function NoticeCard() {
+      const [notice, setNotice] = React.useState(null);
 
       React.useEffect(() => {
-        const previous = typeof document === "undefined" ? null : document.activeElement;
-        if (titleRef.current !== null) titleRef.current.focus();
-        const onKey = (event) => {
-          if (event.key === "Escape") {
-            event.stopPropagation();
-            onClose();
-            return;
-          }
-          if (event.key !== "Tab" || dialogRef.current === null) return;
-          const focusable = dialogRef.current.querySelectorAll("a[href],button,input,select,textarea,[tabindex]:not([tabindex='-1'])");
-          if (focusable.length === 0) return;
-          const first = focusable[0];
-          const last = focusable[focusable.length - 1];
-          if (event.shiftKey && document.activeElement === first) {
-            event.preventDefault();
-            last.focus();
-          } else if (!event.shiftKey && document.activeElement === last) {
-            event.preventDefault();
-            first.focus();
-          }
-        };
-        document.addEventListener("keydown", onKey);
-        return () => {
-          document.removeEventListener("keydown", onKey);
-          if (previous !== null && typeof previous.focus === "function") previous.focus();
-        };
-      }, [onClose]);
+        let disposed = false;
 
+        async function poll() {
+          if (typeof document !== "undefined" && document.hidden === true) return;
+          try {
+            const value = await call("reports", { action: "list", limit: 5 });
+            if (disposed) return;
+            const list = Array.isArray(value.reports) ? value.reports : [];
+            const newest = list.length === 0 ? null : list[0];
+            if (newest === null) return;
+
+            const isNewer = lastNewestId !== null && newest.id !== lastNewestId;
+            // 首次加载：今天那份未读的报告也提示——早上出报时页面常常已经开着或刚打开。
+            const todayKey = dayStamp(new Date());
+            const firstLoadToday = lastNewestId === null
+              && newest.unread === true
+              && dayStamp(new Date(newest.createdAt)) === todayKey;
+            if ((isNewer || firstLoadToday) && newest.unread === true && !seenReports.has(newest.id)) {
+              seenReports.add(newest.id);
+              setNotice(newest);
+              systemNotify(newest);
+            }
+            lastNewestId = newest.id;
+          } catch {
+            // Host 还没就绪，等下一轮
+          }
+        }
+
+        poll();
+        const timer = setInterval(poll, 20000);
+        const onVisible = () => {
+          if (typeof document !== "undefined" && document.hidden !== true) poll();
+        };
+        if (typeof document !== "undefined") document.addEventListener("visibilitychange", onVisible);
+        if (typeof window !== "undefined") window.addEventListener("focus", onVisible);
+        return () => {
+          disposed = true;
+          clearInterval(timer);
+          if (typeof document !== "undefined") document.removeEventListener("visibilitychange", onVisible);
+          if (typeof window !== "undefined") window.removeEventListener("focus", onVisible);
+        };
+      }, []);
+
+      if (notice === null) return null;
+      const dismiss = () => setNotice(null);
       return React.createElement(
         "div",
-        {
-          className: "dsh-nd-overlay",
-          onClick: (event) => { if (event.target === event.currentTarget) onClose(); }
-        },
+        { className: "dsh-nd-notice", role: "status" },
         React.createElement(
           "div",
-          {
-            className: "dsh-nd-dialog",
-            role: "dialog",
-            "aria-modal": "true",
-            "aria-labelledby": "dsh-nd-report-title",
-            ref: dialogRef
-          },
-          React.createElement("h2", { id: "dsh-nd-report-title", tabIndex: -1, ref: titleRef }, report.title),
-          React.createElement(ReportBodyView, { body: report.body, markdown: report.markdown }),
-          React.createElement(
-            "div",
-            { className: "dsh-nd-dialog-foot" },
-            React.createElement("button", { type: "button", className: "dsh-nd-btn", onClick: onClose }, "关闭")
-          )
+          { className: "dsh-nd-notice-head" },
+          React.createElement("div", { className: "dsh-nd-notice-title" }, notice.title),
+          React.createElement("button", { type: "button", className: "dsh-nd-notice-x", "aria-label": "关掉这条提醒", onClick: dismiss }, "×")
+        ),
+        React.createElement(
+          "div",
+          { className: "dsh-nd-notice-text" },
+          notice.overview === "" ? "新的一份已经生成，点开看看。" : notice.overview
+        ),
+        React.createElement(
+          "div",
+          { className: "dsh-nd-notice-actions" },
+          React.createElement("button", { type: "button", className: "dsh-nd-btn is-link", onClick: dismiss }, "稍后"),
+          React.createElement("button", {
+            type: "button",
+            className: "dsh-nd-btn is-primary",
+            onClick: () => {
+              void openReportInBrowser(notice.id);
+              dismiss();
+            }
+          }, "打开")
         )
       );
     }
@@ -335,8 +363,8 @@ window.__ModuleLoader__.load({
       const [note, setNote] = React.useState("");
       const [busy, setBusy] = React.useState("");
       const [newName, setNewName] = React.useState("");
-      const [reader, setReader] = React.useState(null);
       const [confirmId, setConfirmId] = React.useState("");
+      const [openError, setOpenError] = React.useState("");
       const dirtyRef = React.useRef(false);
       const watchRef = React.useRef(null);
       const seqRef = React.useRef(0);
@@ -393,9 +421,15 @@ window.__ModuleLoader__.load({
           if (typeof document !== "undefined" && document.hidden === true) return;
           load();
         }, 30000);
+        // 通知卡里点开也会把红点刷掉。
+        const onOpened = () => {
+          load();
+        };
+        if (typeof window !== "undefined") window.addEventListener("dsh-news-digest:opened", onOpened);
         return () => {
           clearInterval(timer);
           clearWatch();
+          if (typeof window !== "undefined") window.removeEventListener("dsh-news-digest:opened", onOpened);
         };
       }, []);
 
@@ -465,18 +499,19 @@ window.__ModuleLoader__.load({
 
       async function openReport(id) {
         setBusy("read");
+        setOpenError("");
         try {
-          const value = await call("reports", { action: "read", id });
-          const body = value.report;
-          const isBody = body !== null && body !== undefined && Array.isArray(body.groups);
-          setReader({
-            title: isBody ? body.title : (body === null || body === undefined ? id : body.title),
-            body: isBody ? body : null,
-            markdown: value.markdown
+          await call("openInBrowser", { id });
+          // 打开成功 = Host 已把它标成已读，这里先把红点抹掉，再拉一次对齐。
+          setStatus((current) => current === null ? current : {
+            ...current,
+            reports: current.reports.map((item) => (item.id === id ? { ...item, unread: false } : item))
           });
           await load();
         } catch (failure) {
-          setError(failure instanceof Error ? failure.message : String(failure));
+          const text = openFailureText(failure);
+          setOpenError(text);
+          notify(text, false);
         } finally {
           setBusy("");
         }
@@ -801,7 +836,8 @@ window.__ModuleLoader__.load({
               `最近一次判定：${status.state.lastTriggerDay === ""
                 ? "还没有"
                 : `${status.state.lastTriggerAt === "" ? status.state.lastTriggerDay : stamp(status.state.lastTriggerAt)}（${KIND_LABEL[status.state.lastTriggerKind] ?? "未知原因"}）`}`
-              + `${status.state.lastTriggerError === "" ? "" : ` · 上次失败：${status.state.lastTriggerError}`}`)
+              + `${status.state.lastTriggerError === "" ? "" : ` · 上次失败：${status.state.lastTriggerError}`}`
+              + `${status.state.retryDay === status.today && status.state.retryCount > 0 ? ` · 今天已自动补跑 ${status.state.retryCount} 次` : ""}`)
           )
         ),
 
@@ -815,6 +851,9 @@ window.__ModuleLoader__.load({
               status.counts.reports > status.reports.length
                 ? `共 ${status.counts.reports} 份，只显示最近 ${status.reports.length} 份`
                 : `共 ${status.counts.reports} 份`)),
+          openError === ""
+            ? null
+            : React.createElement("div", { className: "dsh-nd-error", role: "alert" }, openError),
           status.reports.length === 0
             ? React.createElement("div", { className: "dsh-nd-empty" }, "还没有日报。点右上角「现在出一份」，或者等定时 / 明天上午第一次用 DSH。")
             : React.createElement(
@@ -848,6 +887,12 @@ window.__ModuleLoader__.load({
                   React.createElement(
                     "div",
                     { className: "dsh-nd-actions" },
+                    React.createElement("button", {
+                      type: "button",
+                      className: "dsh-nd-btn is-link",
+                      disabled: busy !== "",
+                      onClick: () => openReport(item.id)
+                    }, "打开"),
                     confirmId === item.id
                       ? React.createElement(React.Fragment, null,
                           React.createElement("button", { type: "button", className: "dsh-nd-btn is-link is-danger", disabled: busy !== "", onClick: () => removeReport(item.id) }, "确定删除"),
@@ -872,7 +917,6 @@ window.__ModuleLoader__.load({
           }, "撤销改动")
         ),
 
-        reader === null ? null : React.createElement(ReportDialog, { report: reader, onClose: () => setReader(null) })
       );
     }
 
@@ -903,6 +947,10 @@ window.__ModuleLoader__.load({
       ctx.effect(() => ensureStyle());
       slots.inject("settings.section", () =>
         slots.register({ name: "settings.section", id: "news-digest", order: 46, label: () => "新闻日报" }, Section)
+      );
+      // 全局右下角通知：不在设置页时也能把新日报推出来。
+      slots.inject("shell.overlay", () =>
+        slots.register({ name: "shell.overlay", id: "news-digest.notice" }, NoticeCard)
       );
 
       // 设置页左侧导航的图标：不注册就是壳默认的齿轮。

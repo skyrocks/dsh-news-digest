@@ -261,6 +261,8 @@ export function normalizeState(input) {
     lastTriggerAt: asString(value.lastTriggerAt),
     lastTriggerKind: asString(value.lastTriggerKind),
     lastTriggerError: clip(value.lastTriggerError, 200),
+    retryDay: asString(value.retryDay),
+    retryCount: Math.max(0, Math.min(9, Math.round(asNumber(value.retryCount, 0)))),
   }
 }
 
@@ -354,6 +356,7 @@ export function normalizeReportEntry(input) {
     items: Math.max(0, asNumber(value.items, 0)),
     source: asString(value.source) || 'manual',
     path: asString(value.path),
+    htmlPath: asString(value.htmlPath),
     unread: value.unread !== false,
   }
 }
@@ -464,6 +467,24 @@ export function createStore(options = {}) {
     return path
   }
 
+  async function writeReportHtml(id, html) {
+    await mkdir(paths.reportsDir, { recursive: true, mode: 0o700 })
+    const path = join(paths.reportsDir, `${id}.html`)
+    const temporary = `${path}.${process.pid}.tmp`
+    await writeFile(temporary, html, { mode: 0o600 })
+    await rename(temporary, path)
+    return path
+  }
+
+  async function readReportHtml(id) {
+    if (!DATE_PATTERN.test(id)) return ''
+    try {
+      return await readFile(join(paths.reportsDir, `${id}.html`), 'utf8')
+    } catch {
+      return ''
+    }
+  }
+
   async function readReportText(id) {
     if (!DATE_PATTERN.test(id)) return ''
     try {
@@ -486,5 +507,7 @@ export function createStore(options = {}) {
     writeReportBody,
     writeReportText,
     readReportText,
+    writeReportHtml,
+    readReportHtml,
   }
 }

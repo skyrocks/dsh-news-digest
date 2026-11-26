@@ -4,11 +4,12 @@
 //   - 「设置 → 新闻日报」界面通过 ctx.remote.newsDigest.* 调它；
 //   - 模型工具 news_* 也调它。
 // 所以「存一份日报 / 读一份日报 / 立即出一次」只实现一次。
+import { execFile } from 'node:child_process'
 import { unlink } from 'node:fs/promises'
 import { join } from 'node:path'
 import { TypertRemoteService } from '@deepseek-ai/dsh-typert-protocol'
 
-import { reportEntry, reportSummary, renderMarkdown, sourceLabel } from './report.js'
+import { reportEntry, reportSummary, renderMarkdown, renderReportHtml, sourceLabel } from './report.js'
 import { NEWS_PROMPT, NEWS_TITLE, ensureSchedule, runSchedule, scheduleService } from './schedule.js'
 import {
   createStore,
@@ -17,7 +18,7 @@ import {
   normalizeReportBody,
   normalizeSettings,
 } from './store.js'
-import { decideFirstUse } from './trigger.js'
+import { decideFirstUse, retryDecision } from './trigger.js'
 
 const MAX_REPORTS = 120
 
@@ -136,9 +137,15 @@ export class NewsDigestService extends TypertRemoteService {
     const markdown = renderMarkdown(body)
     await this.store.writeReportBody(body)
     const path = await this.store.writeReportText(body.id, markdown)
+    const htmlPath = await this.store.writeReportHtml(body.id, renderReportHtml(body))
+
+    const state = await this.store.readState()
+    if (state.retryDay !== '' || state.retryCount !== 0 || state.lastTriggerError !== '') {
+      await this.store.writeState({ ...state, retryDay: '', retryCount: 0, lastTriggerError: '' })
+    }
 
     const reports = await this.store.readReports()
-    const entry = reportEntry(body, { path })
+    const entry = reportEntry(body, { path, htmlPath })
     const without = reports.filter((item) => item.id !== body.id)
     const saved = pruneReports([entry, ...without])
     await this.store.writeReports(saved)
@@ -151,9 +158,42 @@ export class NewsDigestService extends TypertRemoteService {
       groups: body.groups.length,
       items: totalItems,
       path,
+      htmlPath,
       markdown,
       note: `已保存 ${body.title}：${body.groups.length} 个类别 / ${totalItems} 条${settings.enabled ? '' : '（插件现在是关着的）'}。`,
     }
+  }
+
+  /**
+   * 用系统默认浏览器打开某天的日报（本地 HTML 页面），并把它标成已读。
+   * 老日报没有 HTML 时用存下的 json 现场补一份。
+   * @param {{ id?: string }} request
+   */
+  async openInBrowser(request = {}) {
+    const id = typeof request.id === 'string' ? request.id : ''
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(id)) throw new Error('openInBrowser: 缺少日报日期（YYYY-MM-DD）。')
+    const reports = await this.store.readReports()
+    const entry = reports.find((report) => report.id === id)
+    if (entry === undefined) throw new Error(`没有 ${id} 这份日报。`)
+
+    let current = reports
+    let target = entry.htmlPath
+    if (target === '' || (await this.store.readReportHtml(id)) === '') {
+      const body = await this.store.readReportBody(id)
+      if (body === undefined) throw new Error(`${id} 的正文文件不见了，没法打开。`)
+      target = await this.store.writeReportHtml(id, renderReportHtml(body))
+      current = await this.store.writeReports(current.map((report) => (report.id === id ? { ...report, htmlPath: target } : report)))
+    }
+
+    const command = process.platform === 'darwin' ? 'open' : (process.platform === 'win32' ? 'explorer' : 'xdg-open')
+    await new Promise((resolve, reject) => {
+      execFile(command, [target], (error) => (error === null ? resolve() : reject(error)))
+    })
+
+    if (entry.unread) {
+      await this.store.writeReports(current.map((report) => (report.id === id ? { ...report, unread: false } : report)))
+    }
+    return { ok: true, path: target, id }
   }
 
   /**
@@ -194,7 +234,11 @@ export class NewsDigestService extends TypertRemoteService {
       const hit = reports.find((report) => report.id === id)
       if (hit === undefined) return { reports: [], removed: false, note: '没有这份日报。' }
       await this.store.writeReports(reports.filter((report) => report.id !== id))
-      for (const file of [join(this.store.paths.reportsDir, `${id}.json`), join(this.store.paths.reportsDir, `${id}.md`)]) {
+      for (const file of [
+        join(this.store.paths.reportsDir, `${id}.json`),
+        join(this.store.paths.reportsDir, `${id}.md`),
+        join(this.store.paths.reportsDir, `${id}.html`),
+      ]) {
         try {
           await unlink(file)
         } catch {
@@ -258,6 +302,34 @@ export class NewsDigestService extends TypertRemoteService {
   }
 
   /**
+   * 看任务最后一次投递的时间，判断「投递了但没出报」要不要补一次。
+   * @param {object} state
+   * @param {Date} now
+   */
+  async deliveryVerdict(state, now) {
+    const settings = await this.store.readSettings()
+    if (!settings.enabled) return { retry: false, reason: 'plugin-off' }
+    const schedule = scheduleService(this.ctx)
+    const id = settings.schedule.scheduleId
+    if (schedule === undefined || id === '') return { retry: false, reason: 'no-schedule-service' }
+    let entry
+    try {
+      entry = await schedule.view({ id })
+    } catch {
+      return { retry: false, reason: 'view-failed' }
+    }
+    if (entry === undefined || entry === null || entry.code === 'schedule_not_found') {
+      return { retry: false, reason: 'task-missing' }
+    }
+    return retryDecision({
+      lastDeliveredAt: entry.lastDelivery === undefined || entry.lastDelivery === null ? '' : entry.lastDelivery.deliveredAt,
+      state,
+      now,
+      hasTodayReport: false,
+    })
+  }
+
+  /**
    * 插件升级后把那条计划任务的提示词刷新成当前版本。
    * 只在任务已经存在时更新：用户自己删掉的任务不重建（想重建就点「保存设置」）。
    */
@@ -293,10 +365,36 @@ export class NewsDigestService extends TypertRemoteService {
     this.checking = true
     try {
       const settings = await this.store.readSettings()
-      const state = await this.store.readState()
       const now = new Date()
+      const today = dayKey(now)
       const reports = await this.store.readReports()
-      const todayReport = reports.find((report) => report.date === dayKey(now))
+      const todayReport = reports.find((report) => report.date === today)
+
+      // 对账：上一次投递完 8 分钟还没有今天的日报（常见原因是模型那一轮断网失败），
+      // 就把「今天已触发」放回去，允许当天补跑（每天最多 3 次）。
+      let state = await this.store.readState()
+      if (todayReport === undefined) {
+        let verdict = { retry: false, reason: 'no-schedule-service' }
+        try {
+          verdict = await this.deliveryVerdict(state, now)
+        } catch {
+          // 查任务失败不影响正常判定
+        }
+        if (verdict.retry === true) {
+          state = await this.store.writeState({
+            ...state,
+            lastTriggerDay: '',
+            lastTriggerKind: 'retry',
+            lastTriggerError: '上次投递后没有出报（模型或网络失败），自动补一次',
+            retryDay: verdict.day,
+            retryCount: verdict.next,
+          })
+        }
+      } else if (state.retryDay !== '' || state.retryCount !== 0 || state.lastTriggerError !== '') {
+        // 今天已经有日报了，把补跑计数和错误提示收干净
+        state = await this.store.writeState({ ...state, retryDay: '', retryCount: 0, lastTriggerError: '' })
+      }
+
       const decision = decideFirstUse({ settings, state, now, hasTodayReport: todayReport !== undefined })
 
       if (!decision.fire) {

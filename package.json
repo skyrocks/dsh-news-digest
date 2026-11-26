@@ -1,6 +1,6 @@
 {
   "name": "@skyrocks/dsh-news-digest",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "DeepSeek Harness 插件：每天按你选的类别搜一次实时新闻，出一份可回看的日报；定时之外，每天上午第一次用 DSH 时也会补一次",
   "license": "MIT",
   "type": "module",

@@ -23,6 +23,9 @@ whichever comes first, at most once per day.
   summary, source, link, time). Saved as json + md and readable/deletable under Settings.
 - **No duplicates** — the scheduled run first checks whether today's digest already exists and stops
   if it does; running it again by hand the same day overwrites it.
+- **Notification** — when a new digest is saved, a card appears in the corner of DSH (plus a system
+  notification when allowed). "Open" launches a self-contained local HTML page
+  (`reports/<date>.html`, follows the system light/dark setting).
 
 ## Install
 

@@ -30,6 +30,29 @@ export function decideFirstUse({ settings, state, now, hasTodayReport }) {
   return { fire: true, day, reason: morning ? 'morning-window' : 'backfill', morning }
 }
 
+/** 投递之后等多久还没出报，才判定「这一轮大概率失败了」。日报一般 1–2 分钟出完。 */
+export const RETRY_MIN_MS = 8 * 60 * 1000
+/** 一天最多补跑几次，避免 provider 一直挂时无限重试烧 token。 */
+export const MAX_RETRIES_PER_DAY = 3
+
+/**
+ * 「已经投递过、但今天仍然没有日报」→ 要不要自动补一次。
+ * 只看事实：任务最后一次投递的时间、今天的日报、今天已经补过几次。
+ * @param {{ lastDeliveredAt?: string, state?: object, now: Date, hasTodayReport: boolean }} input
+ * @returns {{ retry: boolean, reason: string, day?: string, used?: number, next?: number }}
+ */
+export function retryDecision({ lastDeliveredAt, state, now, hasTodayReport }) {
+  const day = dayKey(now)
+  if (hasTodayReport) return { retry: false, reason: 'report-exists', day }
+  const at = Date.parse(typeof lastDeliveredAt === 'string' ? lastDeliveredAt : '')
+  if (!Number.isFinite(at)) return { retry: false, reason: 'no-delivery', day }
+  if (dayKey(new Date(at)) !== day) return { retry: false, reason: 'not-today', day }
+  if (now.getTime() - at < RETRY_MIN_MS) return { retry: false, reason: 'too-soon', day }
+  const used = state?.retryDay === day ? Math.max(0, Number(state?.retryCount) || 0) : 0
+  if (used >= MAX_RETRIES_PER_DAY) return { retry: false, reason: 'limit', day, used }
+  return { retry: true, reason: 'no-report-after-delivery', day, used, next: used + 1 }
+}
+
 /**
  * 这条 inbox 消息算不算「人在用」。
  * 只认 source.kind === 'user'，并排掉子代理：子代理的任务消息也用 kind 'user' 投递，

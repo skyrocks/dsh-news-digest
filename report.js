@@ -69,6 +69,84 @@ export function renderMarkdown(report) {
   return `${lines.join('\n').trimEnd()}\n`
 }
 
+function escapeHtml(value) {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;')
+}
+
+/**
+ * 自包含的 HTML 页面：通知点开后在浏览器里看这一份。
+ * 只用 Canvas / CanvasText 两个系统色，亮暗都跟系统走，不依赖任何外部资源。
+ * @param {object} report - normalizeReportBody 的结果
+ */
+export function renderReportHtml(report) {
+  const items = report.groups.reduce((total, group) => total + group.items.length, 0)
+  const meta = `${localStamp(report.createdAt)} · ${sourceLabel(report.source)} · ${report.groups.length} 个类别 / ${items} 条`
+
+  const focus = report.focus.length === 0 ? '' : `
+    <section><h2>值得先看</h2><ol class="focus">${report.focus.map((entry) => (
+      `<li><b>${escapeHtml(entry.title)}</b>${entry.detail === '' ? '' : `<span>${escapeHtml(entry.detail)}</span>`}</li>`
+    )).join('')}</ol></section>`
+
+  const groups = report.groups.map((group) => `
+    <section><h2>${escapeHtml(group.category)}</h2><ul class="items">${group.items.map((item) => (
+      `<li><div class="title">${item.url === ''
+        ? escapeHtml(item.title)
+        : `<a href="${escapeHtml(item.url)}" target="_blank" rel="noreferrer noopener">${escapeHtml(item.title)}</a>`}</div>`
+      + `${item.summary === '' ? '' : `<p class="sum">${escapeHtml(item.summary)}</p>`}`
+      + `${item.source === '' && item.publishedAt === '' ? '' : `<div class="meta">${[escapeHtml(item.source), escapeHtml(item.publishedAt)].filter((value) => value !== '').join(' · ')}</div>`}`
+      + '</li>'
+    )).join('')}</ul></section>`).join('')
+
+  return `<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>${escapeHtml(report.title)}</title>
+<style>
+  :root { color-scheme: light dark; }
+  * { box-sizing: border-box; }
+  body { margin: 0; padding: 40px 24px 64px; font: 15px/1.7 -apple-system, "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+         background: Canvas; color: CanvasText; }
+  main { max-width: 760px; margin: 0 auto; }
+  h1 { font-size: 24px; margin: 0 0 6px; }
+  .meta { font-size: 12px; opacity: .62; }
+  .overview { margin: 18px 0 8px; padding: 14px 16px; border-radius: 10px; background: color-mix(in srgb, CanvasText 6%, Canvas); }
+  section { margin-top: 26px; }
+  h2 { font-size: 13px; letter-spacing: .06em; text-transform: uppercase; opacity: .55; margin: 0 0 10px; }
+  ol.focus { margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 10px; }
+  ol.focus b { display: block; }
+  ol.focus span { font-size: 13px; opacity: .7; }
+  ul.items { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 14px; }
+  ul.items li { padding-bottom: 13px; border-bottom: 1px solid color-mix(in srgb, CanvasText 12%, Canvas); }
+  ul.items li:last-child { border-bottom: 0; padding-bottom: 0; }
+  .title { font-size: 15px; font-weight: 600; }
+  .title a { color: inherit; text-decoration: none; }
+  .title a:hover { text-decoration: underline; }
+  .sum { margin: 4px 0 0; font-size: 13.5px; opacity: .78; }
+  .meta { margin-top: 3px; }
+  footer { margin-top: 40px; font-size: 11.5px; opacity: .45; }
+</style>
+</head>
+<body>
+<main>
+  <h1>${escapeHtml(report.title)}</h1>
+  <div class="meta">${escapeHtml(meta)}</div>
+  ${report.overview === '' ? '' : `<p class="overview">${escapeHtml(report.overview)}</p>`}
+  ${focus}
+  ${groups}
+  <footer>由 DSH 新闻日报生成 · 只收录搜索到的真实链接</footer>
+</main>
+</body>
+</html>
+`
+}
+
 /** 一句话摘要（列表里显示）。 */
 export function reportSummary(report) {
   if (report.overview !== '') return report.overview
@@ -92,6 +170,7 @@ export function reportEntry(report, options = {}) {
     items: report.groups.reduce((total, group) => total + group.items.length, 0),
     source: report.source,
     path: options.path ?? '',
+    htmlPath: options.htmlPath ?? '',
     unread: true,
   }
 }

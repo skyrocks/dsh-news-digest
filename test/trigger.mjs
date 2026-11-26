@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 
-import { decideFirstUse, humanPrompt } from '../trigger.js'
+import { MAX_RETRIES_PER_DAY, RETRY_MIN_MS, decideFirstUse, humanPrompt, retryDecision } from '../trigger.js'
 import { normalizeSettings } from '../store.js'
 
 const tests = []
@@ -121,6 +121,43 @@ test('humanPrompt：只认真人输入，排掉子代理与定时投递', () => 
   // 子代理：任务消息也是 kind 'user'，但不是人在用
   assert.equal(humanPrompt({ agent: { session: { header: { origin: 'subagent' } } }, message: { source: { kind: 'user' } } }), false)
   assert.equal(humanPrompt({ agent: { session: { header: { delegationDepth: 2 } } }, message: { source: { kind: 'user' } } }), false)
+})
+
+test('retryDecision：投递后很久还没日报 → 补一次', () => {
+  const now = new Date(2026, 10, 20, 9, 30)
+  const delivered = new Date(now.getTime() - RETRY_MIN_MS - 60 * 1000).toISOString()
+  const result = retryDecision({ lastDeliveredAt: delivered, state: {}, now, hasTodayReport: false })
+  assert.equal(result.retry, true)
+  assert.equal(result.day, '2026-11-20')
+  assert.equal(result.next, 1)
+})
+
+test('retryDecision：今天已有日报 / 刚投递完 / 昨天投递 / 没有投递 → 不补', () => {
+  const now = new Date(2026, 10, 20, 9, 30)
+  const old = new Date(now.getTime() - 60 * 60 * 1000).toISOString()
+
+  assert.equal(retryDecision({ lastDeliveredAt: old, state: {}, now, hasTodayReport: true }).reason, 'report-exists')
+  assert.equal(retryDecision({ lastDeliveredAt: new Date(now.getTime() - 60 * 1000).toISOString(), state: {}, now, hasTodayReport: false }).reason, 'too-soon')
+  assert.equal(retryDecision({ lastDeliveredAt: new Date(2026, 10, 19, 8, 0).toISOString(), state: {}, now, hasTodayReport: false }).reason, 'not-today')
+  assert.equal(retryDecision({ lastDeliveredAt: '', state: {}, now, hasTodayReport: false }).reason, 'no-delivery')
+  assert.equal(retryDecision({ now, state: {}, hasTodayReport: false }).reason, 'no-delivery')
+})
+
+test('retryDecision：一天最多补 3 次；跨天重新计数', () => {
+  const now = new Date(2026, 10, 20, 9, 30)
+  const delivered = new Date(now.getTime() - RETRY_MIN_MS - 1000).toISOString()
+
+  const second = retryDecision({ lastDeliveredAt: delivered, state: { retryDay: '2026-11-20', retryCount: 1 }, now, hasTodayReport: false })
+  assert.equal(second.retry, true)
+  assert.equal(second.next, 2)
+
+  const blocked = retryDecision({ lastDeliveredAt: delivered, state: { retryDay: '2026-11-20', retryCount: MAX_RETRIES_PER_DAY }, now, hasTodayReport: false })
+  assert.equal(blocked.retry, false)
+  assert.equal(blocked.reason, 'limit')
+
+  const freshDay = retryDecision({ lastDeliveredAt: delivered, state: { retryDay: '2026-11-19', retryCount: MAX_RETRIES_PER_DAY }, now, hasTodayReport: false })
+  assert.equal(freshDay.retry, true)
+  assert.equal(freshDay.next, 1)
 })
 
 let failed = 0

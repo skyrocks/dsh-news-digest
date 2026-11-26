@@ -90,6 +90,19 @@ const parseReportResult = (value) => {
   return value
 }
 
+const parseOpenRequest = (value) => {
+  record(value)
+  string('request.id', value.id)
+  return value
+}
+
+const parseOpenResult = (value) => {
+  record(value)
+  if (value.ok !== true) fail('result.ok', 'true')
+  string('result.path', value.path)
+  return value
+}
+
 const parseReportsResult = (value) => {
   record(value)
   if (!Array.isArray(value.reports)) fail('result.reports', '数组')
@@ -124,6 +137,7 @@ export const TYPERT = {
     invocation('report', request(parseReportRequest), parseReportResult),
     invocation('reports', request(parseReportsRequest), parseReportsResult),
     invocation('runNow', request(parseRunNowRequest), parseRunNow),
+    invocation('openInBrowser', request(parseOpenRequest), parseOpenResult),
   ],
   model: { services: [], events: [], objects: [] },
 }

@@ -90,7 +90,7 @@ test('client bundle：apply 注册设置页并挂远端声明', async () => {
   assert.equal(mounted.length, 1)
   const remote = mounted[0]
   assert.equal(remote.package, '@skyrocks/dsh-news-digest')
-  assert.equal(remote.descriptors.map((item) => item.method).join(','), 'status,saveSettings,report,reports,runNow')
+  assert.equal(remote.descriptors.map((item) => item.method).join(','), 'status,saveSettings,report,reports,runNow,openInBrowser')
   for (const descriptor of remote.descriptors) {
     assert.equal(descriptor.service, 'newsDigest')
     assert.equal(descriptor.namespace, 'newsDigest')
@@ -101,6 +101,17 @@ test('client bundle：apply 注册设置页并挂远端声明', async () => {
   assert.equal(remote.descriptors[0].parameters.length, 0)
   assert.equal(remote.descriptors[1].parameters.length, 1)
   assert.equal(effectCount > 0, true)
+
+  // 通知：全局浮层那一格也要注册
+  assert.equal(registered.includes('shell.overlay'), true)
+  const notice = registered.find((item) => typeof item === 'object' && item !== null && item.name === 'shell.overlay')
+  assert.equal(notice.id, 'news-digest.notice')
+})
+
+test('client bundle：不再用弹框看日报，改成开浏览器', () => {
+  assert.doesNotMatch(source, /ReportDialog/)
+  assert.doesNotMatch(source, /dsh-nd-overlay/)
+  assert.match(source, /openInBrowser/)
 })
 
 test('client bundle：只用主题变量，不引 primitives', () => {

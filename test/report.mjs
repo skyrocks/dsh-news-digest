@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 
 import { normalizeReportBody, normalizeItem, normalizeGroup } from '../store.js'
-import { renderMarkdown, reportEntry, reportSummary, sourceLabel } from '../report.js'
+import { renderMarkdown, renderReportHtml, reportEntry, reportSummary, sourceLabel } from '../report.js'
 
 const tests = []
 const test = (name, fn) => tests.push({ name, fn })
@@ -66,14 +66,37 @@ test('renderMarkdown：小标题、重点、分组、链接都在', () => {
   assert.doesNotMatch(text, /javascript:/)
 })
 
+test('renderReportHtml：自包含、转义、带真实链接', () => {
+  const body = normalizeReportBody(sample)
+  const html = renderReportHtml(body)
+  assert.match(html, /^<!doctype html>/)
+  assert.match(html, /<title>新闻日报 · 2026-11-19<\/title>/)
+  assert.match(html, /值得先看/)
+  assert.match(html, /href="https:\/\/example\.com\/a"/)
+  assert.match(html, /rel="noreferrer noopener"/)
+  // 不引外部资源、不带脚本
+  assert.doesNotMatch(html, /<script/i)
+  assert.doesNotMatch(html, /https?:\/\/(?!example\.com\/a)/)
+  assert.doesNotMatch(html, /<link /)
+  // 标题里的尖括号被转义
+  const risky = normalizeReportBody({
+    date: '2026-11-19',
+    groups: [{ category: '科技', items: [{ title: '<img src=x onerror=1>', url: 'javascript:alert(1)' }] }],
+  })
+  const escaped = renderReportHtml(risky)
+  assert.match(escaped, /&lt;img src=x onerror=1&gt;/)
+  assert.doesNotMatch(escaped, /javascript:/)
+})
+
 test('reportEntry / reportSummary / sourceLabel', () => {
   const body = normalizeReportBody(sample)
-  const entry = reportEntry(body, { path: '/tmp/x' })
+  const entry = reportEntry(body, { path: '/tmp/x', htmlPath: '/tmp/x.html' })
   assert.equal(entry.groups, 2)
   assert.equal(entry.items, 3)
   assert.equal(entry.overview, '今天有三件大事。')
   assert.equal(entry.unread, true)
   assert.equal(entry.path, '/tmp/x')
+  assert.equal(entry.htmlPath, '/tmp/x.html')
 
   const bare = normalizeReportBody({ date: '2026-11-18', groups: [{ category: '体育', items: [{ title: '只有标题' }] }] })
   assert.equal(reportSummary(bare), '只有标题')
